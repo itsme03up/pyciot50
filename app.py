@@ -4,92 +4,205 @@ import streamlit as st
 from dataclasses import dataclass
 
 # ====== ページ設定 ======
-st.set_page_config(page_title="川田の冒険：CBTクイズRPG", page_icon="🗡️", layout="centered")
+st.set_page_config(page_title="勇者の冒険：CBTクエスト", page_icon="🐉", layout="centered")
 
-# ====== ダークUI用CSS ======
-DARK_CSS = """
-<style>
-/* 背景：ダーク＋グラデーション */
+# ====== ドラクエ風UI用CSS ======
+DQ_CSS = """
+.dq-window-1 {
+  background-color: black;
+  padding: 0.15rem;
+  width: fit-content;
+  border-radius: 0.4rem;
+}
+
+.dq-window-2 {
+  background-color: white;
+  padding: 0.2rem;
+  border-radius: 0.3rem;
+  width: fit-content;
+}
+
+.dq-window-3 {
+  color: white;
+  background-color: black;
+  font-family: "Courier New", monospace;
+  border-radius: 0.3rem;
+  padding: 1.0rem 0.75rem;
+  line-height: 2;
+  width: fit-content;
+  font-weight: bold;
+}
+
+/* 背景：ドラクエ風の青いグラデーション */
 html, body, [data-testid="stAppViewContainer"] {
-  background: radial-gradient(1200px 600px at 20% 0%, #1d1f2a 0%, #0f1117 60%, #0b0d12 100%) !important;
-  color: #e2e8f0 !important;
-  font-weight: 480;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1e3c72 100%) !important;
+  color: #ffffff !important;
+  font-family: "Courier New", monospace !important;
+  font-weight: bold;
 }
 
-/* 見出し */
+/* 見出し：ドラクエ風のタイトル */
 h1, h2, h3, h4, h5 {
-  color: #f8fafc !important;
+  color: #ffff00 !important;
+  text-shadow: 2px 2px 0px #000000, -1px -1px 0px #000000, 1px -1px 0px #000000, -1px 1px 0px #000000;
   letter-spacing: .02em;
+  text-align: center;
+  font-family: "Courier New", monospace !important;
 }
 
-/* カード/メッセージのコントラスト */
-.block-container { padding-top: 2rem !important; }
+/* メインコンテナ */
+.block-container { 
+  padding-top: 2rem !important;
+  max-width: 800px !important;
+}
+
+/* Streamlitのアラート要素をドラクエ風に */
 .stAlert {
-  background: rgba(25, 30, 45, .65) !important;
-  border: 1px solid rgba(148,163,184,.25) !important;
-  border-radius: 12px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  color: #ffffff !important;
+  font-family: "Courier New", monospace !important;
+  font-weight: bold !important;
+  box-shadow: none !important;
+  padding: 0 !important;
 }
 
-/* ラジオ・ボタン */
+/* ラジオボタン：コマンド風 */
+[data-testid="stRadio"] {
+  background: transparent;
+  border: none;
+  padding: 1rem 0;
+}
+
 [data-testid="stRadio"] label {
-  background: rgba(148,163,184,.08);
-  border: 1px solid rgba(148,163,184,.18);
-  border-radius: 10px;
-  padding: .45rem .7rem;
-  margin-bottom: .35rem;
-}
-button[kind="primary"] {
-  border-radius: 10px !important;
-  border: 1px solid rgba(148,163,184,.25) !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  margin-bottom: 0.5rem !important;
+  color: #ffffff !important;
+  font-family: "Courier New", monospace !important;
+  font-weight: bold !important;
+  cursor: pointer;
+  display: block !important;
 }
 
-/* HPバー（カスタム） */
-.rpgbar {
-  width: 100%;
-  background: linear-gradient(90deg, rgba(148,163,184,.12), rgba(148,163,184,.05));
-  border: 1px solid rgba(148,163,184,.25);
-  border-radius: 10px;
-  height: 20px;
+/* ボタン：透明化 */
+button[kind="primary"], button {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  color: transparent !important;
+  font-family: "Courier New", monospace !important;
+  font-weight: bold !important;
+  font-size: 16px !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  transition: none !important;
+  height: 0px !important;
+  min-height: 0px !important;
+  visibility: hidden !important;
+  position: absolute !important;
+}
+
+/* HPバー：ドラクエ風 */
+.dq-hpbar-container {
+  background-color: black;
+  padding: 0.15rem;
+  border-radius: 0.4rem;
+  margin: 8px 0;
+}
+
+.dq-hpbar-border {
+  background-color: white;
+  padding: 0.2rem;
+  border-radius: 0.3rem;
+}
+
+.dq-hpbar {
+  background: black;
+  border-radius: 0.3rem;
+  height: 24px;
   position: relative;
   overflow: hidden;
+  padding: 2px;
 }
-.rpgbar-fill {
+
+.dq-hpbar-fill {
   height: 100%;
-  border-radius: 10px;
-  background: linear-gradient(90deg, var(--c1), var(--c2));
-  box-shadow: 0 0 12px var(--c2, #22c55e88);
+  background: var(--hp-color);
   width: var(--w, 100%);
-  transition: width .45s ease;
-}
-.rpgbar-gloss {
-  position: absolute; inset: 0;
-  background: linear-gradient(to bottom, rgba(255,255,255,.18), rgba(255,255,255,0));
-  mix-blend-mode: soft-light;
+  transition: width .6s ease;
+  position: relative;
+  border-radius: 2px;
 }
 
-/* ダメージ/ヒールの浮遊テキスト */
-.float-dmg {
-  color: #fca5a5; font-weight: 700;
-  text-shadow: 0 0 8px rgba(220,38,38,.75);
-  animation: rise 900ms ease forwards;
-}
-.float-heal {
-  color: #86efac; font-weight: 700;
-  text-shadow: 0 0 8px rgba(34,197,94,.7);
-  animation: rise 900ms ease forwards;
-}
-@keyframes rise {
-  from { transform: translateY(0); opacity: .0; }
-  to   { transform: translateY(-18px); opacity: 1; }
+.dq-hpbar-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #ffffff;
+  font-family: "Courier New", monospace;
+  font-weight: bold;
+  font-size: 12px;
+  text-shadow: 1px 1px 0px #000000;
+  z-index: 10;
 }
 
-/* 区切り線を控えめに */
+/* ダメージテキスト：ドラクエ風 */
+.dq-damage {
+  color: #ff0000;
+  font-family: "Courier New", monospace;
+  font-weight: bold;
+  font-size: 24px;
+  text-shadow: 2px 2px 0px #000000, -1px -1px 0px #000000, 1px -1px 0px #000000, -1px 1px 0px #000000;
+  animation: dq-float 1.2s ease forwards;
+  text-align: center;
+}
+
+@keyframes dq-float {
+  0% { transform: translateY(0px); opacity: 1; }
+  50% { transform: translateY(-20px); opacity: 1; }
+  100% { transform: translateY(-40px); opacity: 0; }
+}
+
+/* 区切り線 */
 hr, [data-testid="stDivider"] {
-  border-color: rgba(148,163,184,.2) !important;
+  border: 2px solid #ffffff !important;
+  margin: 2rem 0 !important;
 }
-</style>
+
+/* ステータス表示 */
+.dq-status {
+  background: transparent;
+  margin: 1rem 0;
+}
+
+.dq-character {
+  text-align: center;
+  font-size: 2rem;
+  margin: 0.5rem 0;
+}
+
+/* メッセージの▼マーク */
+.dq-continue {
+  text-align: center;
+  color: #ffff00;
+  font-size: 20px;
+  animation: blink 1.5s infinite;
+  margin-top: 1rem;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.3; }
+}
 """
-st.markdown(DARK_CSS, unsafe_allow_html=True)
+
+DRAGON_QUEST_CSS = f"<style>{DQ_CSS}</style>"
+st.markdown(DRAGON_QUEST_CSS, unsafe_allow_html=True)
 
 # ====== 問題データ読み込み ======
 def load_questions(fp="questions.json"):
@@ -129,7 +242,7 @@ class Fighter:
 
 # ====== ユーティリティ ======
 def init_game():
-    st.session_state.player = Fighter("あなた", max_hp=120, atk=20)
+    st.session_state.player = Fighter("勇者", max_hp=120, atk=20)
     st.session_state.boss   = Fighter("タイポ魔王", max_hp=200, atk=18)
     questions = load_questions()
     if not questions:
@@ -144,21 +257,71 @@ def init_game():
     st.session_state.last = None   # ("correct"/"wrong", 正解番号, 解説)
     st.session_state.state = "asking"
 
-def hp_bar(label: str, current: int, maximum: int, color1: str, color2: str):
+def dq_hp_bar(name: str, current: int, maximum: int, character: str):
+    """ドラクエ風HPバー表示（3層構造）"""
     pct = max(0, min(1, current/maximum))
     width = f"{pct*100:.1f}%"
+    
+    # HP割合に応じて色を変更（ドラクエ風）
+    if pct > 0.6:
+        hp_color = "#00ff00"  # 緑
+    elif pct > 0.3:
+        hp_color = "#ffff00"  # 黄
+    else:
+        hp_color = "#ff0000"  # 赤
+    
     html = f"""
-      <div style="margin-bottom:.25rem;font-weight:700">{label}: {current} / {maximum}</div>
-      <div class="rpgbar">
-        <div class="rpgbar-fill" style="--w:{width}; --c1:{color1}; --c2:{color2};"></div>
-        <div class="rpgbar-gloss"></div>
-      </div>
+    <div class="dq-status">
+        <div class="dq-character">{character}</div>
+        <div class="dq-window-1">
+            <div class="dq-window-2">
+                <div class="dq-window-3" style="text-align: center; margin: 0; padding: 0.5rem;">
+                    {name}
+                </div>
+            </div>
+        </div>
+        <div class="dq-hpbar-container">
+            <div class="dq-hpbar-border">
+                <div class="dq-hpbar">
+                    <div class="dq-hpbar-fill" style="--w:{width}; --hp-color:{hp_color};"></div>
+                    <div class="dq-hpbar-text">HP: {current} / {maximum}</div>
+                </div>
+            </div>
+        </div>
+    </div>
     """
     st.markdown(html, unsafe_allow_html=True)
 
-def float_text(text: str, kind: str = "dmg"):
-    cls = "float-dmg" if kind == "dmg" else "float-heal"
-    st.markdown(f'<div class="{cls}">{text}</div>', unsafe_allow_html=True)
+def dq_message_box(message: str, title: str = ""):
+    """ドラクエ風メッセージボックス（3層構造）"""
+    title_html = f"""
+    <div class="dq-window-1">
+        <div class="dq-window-2">
+            <div class="dq-window-3" style="color: #ffff00; text-align: center; margin: 0;">
+                {title}
+            </div>
+        </div>
+    </div>
+    """ if title else ""
+    
+    html = f"""
+    {title_html}
+    <div class="dq-window-1">
+        <div class="dq-window-2">
+            <div class="dq-window-3">
+                {message}
+                <div class="dq-continue">▼</div>
+            </div>
+        </div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
+
+def dq_damage_text(text: str, is_damage: bool = True):
+    """ドラクエ風ダメージ/回復テキスト"""
+    css_class = "dq-damage"
+    html = f'<div class="{css_class}">{text}</div>'
+    st.markdown(html, unsafe_allow_html=True)
 
 # ====== 初期化 ======
 if "qs" not in st.session_state:
@@ -168,39 +331,69 @@ player = st.session_state.player
 boss = st.session_state.boss
 
 # ====== ヘッダ ======
-st.markdown("## 🗡️ 川田の冒険：CBTクイズRPG")
-st.caption("正解で攻撃 / 不正解で被弾。3連続正解で **クリティカル**！")
+st.markdown("## 🐉 勇者の冒険：CBTクエスト")
+st.caption("正解で魔物を攻撃！ 不正解で反撃を受ける。3連続正解で **会心の一撃**！")
 
-# リセット
-colA, colB = st.columns([1,1])
-with colA:
-    if st.button("🔄 ゲームをリセット", use_container_width=True):
-        init_game()
-        st.rerun()
+# リセットボタンも3層構造
+reset_button_html = """
+<div class="dq-window-1" style="margin: 1rem 0;">
+    <div class="dq-window-2">
+        <div class="dq-window-3" style="text-align: center; cursor: pointer;">
+            冒険をやり直す
+        </div>
+    </div>
+</div>
+"""
+st.markdown(reset_button_html, unsafe_allow_html=True)
 
-# HPバー（ダーク仕様）
+if st.button("実行", key="reset"):
+    init_game()
+    st.rerun()
+
+# HPバー（ドラクエ風）
 c1, c2 = st.columns(2)
 with c1:
-    hp_bar("🧙 あなた", player.hp, player.max_hp, "#22c55e", "#16a34a")  # 緑系
+    dq_hp_bar("勇者", player.hp, player.max_hp, "🧙‍♂️")
 with c2:
-    hp_bar("👾 タイポ魔王", boss.hp, boss.max_hp, "#ef4444", "#b91c1c")   # 赤系
+    dq_hp_bar("タイポ魔王", boss.hp, boss.max_hp, "👾")
 
 st.divider()
 
 # ====== ゲーム終了判定 ======
 if st.session_state.state == "finished":
     if boss.alive() and not player.alive():
-        st.error("❌ あなたは倒れてしまった… 期末までにもうひと踏ん張り！")
-        st.snow()  # 敗北エフェクト（雪を悲壮感に見立てる）
+        dq_message_box("勇者は力尽きた…", "😵 GAME OVER")
+        st.error("💀 あなたは倒れてしまった… 期末までにもうひと踏ん張り！")
+        st.snow()
     elif player.alive() and not boss.alive():
-        st.success("🏆 勝利！ タイポ魔王は霧散した。『愚直にやるしかないっすよ』の勝利だ！")
-        st.balloons()  # 勝利演出
+        dq_message_box("タイポ魔王をたおした！", "🏆 VICTORY!")
+        st.success("🎉 勝利！ タイポ魔王は霧散した。知識の力で勝利を掴んだ！")
+        st.balloons()
     else:
         if boss.hp < player.hp:
-            st.info("⌛ 時間切れだが優勢！よく戦った！")
+            dq_message_box("時間切れだが優勢！よく戦った！", "⌛ 引き分け")
         else:
-            st.warning("⌛ 時間切れで痛み分け。復習して再挑戦！")
-    st.metric("スコア", f"{st.session_state.score} / {len(st.session_state.qs)}")
+            dq_message_box("時間切れで痛み分け。復習して再挑戦！", "⌛ 引き分け")
+    
+    # スコア表示をドラクエ風に（3層構造）
+    score_html = f"""
+    <div class="dq-window-1">
+        <div class="dq-window-2">
+            <div class="dq-window-3">
+                <div style="color: #ffff00; text-align: center; font-size: 1.2em; margin-bottom: 1rem;">
+                    冒険の結果
+                </div>
+                <div style="margin-bottom: 0.5rem;">
+                    正答数: {st.session_state.score} / {len(st.session_state.qs)}
+                </div>
+                <div>
+                    正答率: {st.session_state.score / len(st.session_state.qs) * 100:.1f}%
+                </div>
+            </div>
+        </div>
+    </div>
+    """
+    st.markdown(score_html, unsafe_allow_html=True)
     st.stop()
 
 # ====== 出題 ======
@@ -211,24 +404,52 @@ if idx >= len(st.session_state.qs):
 
 q = st.session_state.qs[idx]
 
-st.subheader(f"ターン {idx+1}")
-st.write(f"**[Unit {q['unit']}] {q['topic']}**")
-st.write(q["q"])
+# ドラクエ風の問題表示（3層構造）
+html = f"""
+<div class="dq-window-1">
+    <div class="dq-window-2">
+        <div class="dq-window-3">
+            <div style="color: #ffff00; text-align: center; font-size: 1.2em; margin-bottom: 1rem;">
+                ターン {idx+1}
+            </div>
+            <div style="margin-bottom: 0.5rem;">
+                <strong>[Unit {q['unit']}] {q['topic']}</strong>
+            </div>
+            <div>
+                {q["q"]}
+            </div>
+        </div>
+    </div>
+</div>
+"""
+st.markdown(html, unsafe_allow_html=True)
 
+# 選択肢も3層構造で表示
 choice = st.radio(
-    "選択肢を選んでください",
+    "コマンドを選択せよ",
     options=[f"{i+1}) {c}" for i, c in enumerate(q["choices"])],
-    index=None,
-    label_visibility="collapsed"
+    index=None
 )
 
 # ====== 判定 ======
 if st.session_state.state == "asking":
     disabled = choice is None
-    if st.button("⚔️ 判定する", type="primary", disabled=disabled, use_container_width=True):
+    # ドラクエ風ボタン（3層構造）
+    button_html = f"""
+    <div class="dq-window-1" style="margin: 1rem 0;">
+        <div class="dq-window-2">
+            <div class="dq-window-3" style="text-align: center; cursor: {'not-allowed' if disabled else 'pointer'}; opacity: {'0.5' if disabled else '1'};">
+                ⚔️ たたかう
+            </div>
+        </div>
+    </div>
+    """
+    st.markdown(button_html, unsafe_allow_html=True)
+    
+    if not disabled and st.button("実行", key="battle"):
         picked = None if choice is None else int(choice.split(")")[0])
         if picked == q["a"]:
-            # 連続正解判定（3連続でクリティカル）
+            # 連続正解判定（3連続で会心の一撃）
             st.session_state.streak += 1
             crit = (st.session_state.streak >= 3)
             dmg = player.atk * (2 if crit else 1)
@@ -245,21 +466,46 @@ if st.session_state.state == "asking":
 elif st.session_state.state == "judged":
     result, ans_idx, exp, amount, crit = st.session_state.last
     if result == "correct":
-        msg = f"✅ 正解！ {('💥 クリティカル！ ' if crit else '')}{boss.name}に **{amount}** ダメージ！ 残HP: {max(boss.hp,0)}"
-        st.success(msg)
-        float_text(f"-{amount}", "dmg")
+        crit_msg = "会心の一撃だ！" if crit else ""
+        dq_message_box(f"正解！ {crit_msg}{boss.name}に {amount} のダメージを与えた！", "🗡️ 攻撃成功")
+        dq_damage_text(f"-{amount}", True)
         if crit:
-            st.toast("💥 クリティカルヒット！", icon="🔥")
+            st.toast("💥 会心の一撃！", icon="🔥")
     else:
-        st.error(f"❌ 不正解… {boss.name}の反撃！ あなたは **{amount}** ダメージ。残HP: {max(player.hp,0)}")
-        st.info(f"正解は {ans_idx}) {q['choices'][ans_idx-1]}")
-        if exp: st.caption(f"補足：{exp}")
-        float_text(f"-{amount}", "dmg")
+        dq_message_box(f"不正解… {boss.name}の反撃！ {amount} のダメージを受けた！", "💀 被弾")
+        
+        # 正解表示をドラクエ風に（3層構造）
+        correct_html = f"""
+        <div class="dq-window-1">
+            <div class="dq-window-2">
+                <div class="dq-window-3">
+                    <div style="margin-bottom: 0.5rem;">
+                        <strong>正解は：</strong> {ans_idx}) {q['choices'][ans_idx-1]}
+                    </div>
+                    {f'<div><strong>解説：</strong> {exp}</div>' if exp else ''}
+                </div>
+            </div>
+        </div>
+        """
+        st.markdown(correct_html, unsafe_allow_html=True)
+        dq_damage_text(f"-{amount}", True)
 
     # 終了チェック
     end = (not player.alive()) or (not boss.alive())
 
-    if st.button("▶ 次へ", use_container_width=True):
+    # 次へボタンも3層構造
+    next_button_html = f"""
+    <div class="dq-window-1" style="margin: 1rem 0;">
+        <div class="dq-window-2">
+            <div class="dq-window-3" style="text-align: center; cursor: pointer;">
+                ▶ つぎへ
+            </div>
+        </div>
+    </div>
+    """
+    st.markdown(next_button_html, unsafe_allow_html=True)
+    
+    if st.button("実行", key="next"):
         st.session_state.idx += 1
         st.session_state.state = "finished" if end else "asking"
         st.rerun()
