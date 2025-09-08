@@ -2,203 +2,135 @@ import json
 import random
 import streamlit as st
 from dataclasses import dataclass
+import os
 
+# ====== バランス定数（基準は40問） ======
+BASELINE_QUESTIONS = 40
+PLAYER_BASE_HP = 120
+BOSS_BASE_HP = 200
+PLAYER_ATK = 20
+BOSS_ATK = 18
+# 追加倍率（環境変数で上書き可: HP_SCALE）
+try:
+    EXTRA_HP_SCALE = float(os.getenv("HP_SCALE", "1.0"))
+except Exception:
+    EXTRA_HP_SCALE = 1.0
 # ====== ページ設定 ======
-st.set_page_config(page_title="勇者の冒険：CBTクエスト", page_icon="🐉", layout="centered")
+st.set_page_config(page_title="勇者の冒険：CBTクエスト", layout="wide")
 
-# ====== ドラクエ風UI用CSS ======
+# ====== ドラクエ風UI用CSS（見た目と操作性を改善） ======
 DQ_CSS = """
-.dq-window-1 {
-  background-color: black;
-  padding: 0.15rem;
-  width: fit-content;
-  border-radius: 0.4rem;
+/* Retro JP font (細字で省スペース) */
+@import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
+
+:root {
+  --dq-font: 'DotGothic16', 'Noto Sans JP', system-ui, sans-serif;
+  --dq-white: #ffffff;
+  --dq-black: #000000;
 }
 
-.dq-window-2 {
-  background-color: white;
-  padding: 0.2rem;
-  border-radius: 0.3rem;
-  width: fit-content;
+/* 1画面表示 → 余白縮小 + スクロール抑制 */
+html, body {
+  background: var(--dq-black) !important;
+  color: var(--dq-white) !important;
+  font-family: var(--dq-font) !important;
+  font-weight: 700;
+  height: 100%;
+  overflow: hidden; /* 極力スクロールさせない */
+}
+[data-testid="stAppViewContainer"] {
+  height: 100vh;
+  overflow: hidden;
 }
 
-.dq-window-3 {
-  color: white;
-  background-color: black;
-  font-family: "Courier New", monospace;
-  border-radius: 0.3rem;
-  padding: 1.0rem 0.75rem;
-  line-height: 2;
-  width: fit-content;
-  font-weight: bold;
-}
+/* Streamlit UIの余白/ヘッダ類を隠す */
+#MainMenu {visibility: hidden;}
+header {visibility: hidden; height: 0;}
+footer {visibility: hidden;}
+[data-testid="stToolbar"] {display:none}
 
-/* 背景：ドラクエ風の青いグラデーション */
-html, body, [data-testid="stAppViewContainer"] {
-  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1e3c72 100%) !important;
-  color: #ffffff !important;
-  font-family: "Courier New", monospace !important;
-  font-weight: bold;
-}
-
-/* 見出し：ドラクエ風のタイトル */
+/* 見出し（白のみ） */
 h1, h2, h3, h4, h5 {
-  color: #ffff00 !important;
-  text-shadow: 2px 2px 0px #000000, -1px -1px 0px #000000, 1px -1px 0px #000000, -1px 1px 0px #000000;
+  color: var(--dq-white) !important;
+  text-shadow: 2px 2px 0 #000;
   letter-spacing: .02em;
   text-align: center;
-  font-family: "Courier New", monospace !important;
+  font-family: var(--dq-font) !important;
+  margin: .25rem 0 .5rem 0 !important;
 }
 
-/* メインコンテナ */
-.block-container { 
-  padding-top: 2rem !important;
-  max-width: 800px !important;
+/* メインコンテナ幅と余白（高さに合わせて縮むフォント） */
+.block-container {
+  padding-top: .5rem !important;
+  padding-bottom: .5rem !important;
+  max-width: 1100px !important;
 }
+body { font-size: clamp(12px, 1.8vh, 16px); }
 
-/* Streamlitのアラート要素をドラクエ風に */
+/* アラート：モノクロで控えめ */
 .stAlert {
-  background: transparent !important;
-  border: none !important;
-  border-radius: 0 !important;
-  color: #ffffff !important;
-  font-family: "Courier New", monospace !important;
-  font-weight: bold !important;
+  background: rgba(255,255,255,.04) !important;
+  border: 2px solid #fff !important;
+  border-radius: 4px !important;
+  color: #fff !important;
+  font-family: var(--dq-font) !important;
+  font-weight: 700 !important;
   box-shadow: none !important;
-  padding: 0 !important;
 }
 
-/* ラジオボタン：コマンド風 */
-[data-testid="stRadio"] {
-  background: transparent;
-  border: none;
-  padding: 1rem 0;
-}
-
+/* ラジオ（コマンド風・省スペース） */
+[data-testid="stRadio"] { padding: .25rem 0 .1rem 0; }
 [data-testid="stRadio"] label {
-  background: transparent !important;
-  border: none !important;
-  border-radius: 0 !important;
-  padding: 0 !important;
-  margin-bottom: 0.5rem !important;
-  color: #ffffff !important;
-  font-family: "Courier New", monospace !important;
-  font-weight: bold !important;
-  cursor: pointer;
+  color: #fff !important;
+  padding: .15rem 0 !important;
+  margin-bottom: .15rem !important;
   display: block !important;
 }
 
-/* ボタン：透明化 */
-button[kind="primary"], button {
-  background: transparent !important;
-  border: none !important;
-  border-radius: 0 !important;
-  color: transparent !important;
-  font-family: "Courier New", monospace !important;
-  font-weight: bold !important;
-  font-size: 16px !important;
-  padding: 0 !important;
-  box-shadow: none !important;
-  transition: none !important;
-  height: 0px !important;
-  min-height: 0px !important;
-  visibility: hidden !important;
-  position: absolute !important;
+/* ボタン：モノクロDQ風 */
+.stButton > button {
+  background: #000 !important;
+  color: #fff !important;
+  border: 2px solid #fff !important;
+  border-radius: 4px !important;
+  font-family: var(--dq-font) !important;
+  font-weight: 800 !important;
+  font-size: clamp(12px, 1.8vh, 16px) !important;
+  padding: .45rem .7rem !important;
+  box-shadow: 0 0 0 3px #000, 0 0 0 5px #fff !important;
 }
+.stButton > button:hover { filter: brightness(1.1) contrast(1.05); }
+.stButton > button:active { transform: translateY(1px); }
+.stButton > button:disabled { opacity: .5 !important; cursor: not-allowed !important; }
 
-/* HPバー：ドラクエ風 */
-.dq-hpbar-container {
-  background-color: black;
-  padding: 0.15rem;
-  border-radius: 0.4rem;
-  margin: 8px 0;
-}
+/* HPバー（省スペース） */
+.dq-hpbar-container { background-color: black; padding: 0.12rem; border-radius: 0.35rem; margin: 4px 0; }
+.dq-hpbar-border { background-color: white; padding: 0.16rem; border-radius: 0.25rem; }
+.dq-hpbar { background: black; border-radius: 0.25rem; height: 18px; position: relative; overflow: hidden; padding: 2px; }
+.dq-hpbar-fill { height: 100%; background: var(--hp-color); width: var(--w, 100%); transition: width .4s ease; border-radius: 2px; }
+.dq-hpbar-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; font-family: var(--dq-font); font-weight: 800; font-size: 11px; text-shadow: 1px 1px 0px #000; z-index: 10; }
 
-.dq-hpbar-border {
-  background-color: white;
-  padding: 0.2rem;
-  border-radius: 0.3rem;
-}
+/* 3層ウィンドウ（白黒） */
+.dq-window-1 { background-color: black; padding: 0.12rem; width: 100%; border-radius: 0.35rem; }
+.dq-window-2 { background-color: white; padding: 0.16rem; border-radius: 0.25rem; }
+.dq-window-3 { color: white; background-color: black; border-radius: 0.25rem; padding: 0.6rem 0.6rem; line-height: 1.5; font-family: var(--dq-font); font-weight: 800; }
 
-.dq-hpbar {
-  background: black;
-  border-radius: 0.3rem;
-  height: 24px;
-  position: relative;
-  overflow: hidden;
-  padding: 2px;
-}
-
-.dq-hpbar-fill {
-  height: 100%;
-  background: var(--hp-color);
-  width: var(--w, 100%);
-  transition: width .6s ease;
-  position: relative;
-  border-radius: 2px;
-}
-
-.dq-hpbar-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: #ffffff;
-  font-family: "Courier New", monospace;
-  font-weight: bold;
-  font-size: 12px;
-  text-shadow: 1px 1px 0px #000000;
-  z-index: 10;
-}
-
-/* ダメージテキスト：ドラクエ風 */
-.dq-damage {
-  color: #ff0000;
-  font-family: "Courier New", monospace;
-  font-weight: bold;
-  font-size: 24px;
-  text-shadow: 2px 2px 0px #000000, -1px -1px 0px #000000, 1px -1px 0px #000000, -1px 1px 0px #000000;
-  animation: dq-float 1.2s ease forwards;
-  text-align: center;
-}
-
-@keyframes dq-float {
-  0% { transform: translateY(0px); opacity: 1; }
-  50% { transform: translateY(-20px); opacity: 1; }
-  100% { transform: translateY(-40px); opacity: 0; }
-}
+/* ダメージテキスト */
+.dq-damage { color: #ffffff; font-family: var(--dq-font); font-weight: 900; font-size: clamp(16px, 2.2vh, 22px); text-shadow: 2px 2px 0 #000; animation: dq-float 1.0s ease forwards; text-align: center; }
+@keyframes dq-float { 0% { transform: translateY(0px); opacity: 1; } 50% { transform: translateY(-14px); opacity: 1; } 100% { transform: translateY(-28px); opacity: 0; } }
 
 /* 区切り線 */
-hr, [data-testid="stDivider"] {
-  border: 2px solid #ffffff !important;
-  margin: 2rem 0 !important;
-}
+hr, [data-testid="stDivider"] { border: 2px solid #ffffff !important; margin: .6rem 0 !important; }
 
-/* ステータス表示 */
-.dq-status {
-  background: transparent;
-  margin: 1rem 0;
-}
+/* ステータス：アイコン領域をフレックスにして省スペース */
+.dq-status { background: transparent; margin: .35rem 0; }
+.dq-status-wrap { display: flex; align-items: center; gap: .5rem; }
+.dq-character { text-align: center; font-size: 1.6rem; margin: 0; }
+.dq-character-img { width: 40px; height: 40px; image-rendering: pixelated; filter: grayscale(1) brightness(1.2) contrast(1.2); }
 
-.dq-character {
-  text-align: center;
-  font-size: 2rem;
-  margin: 0.5rem 0;
-}
-
-/* メッセージの▼マーク */
-.dq-continue {
-  text-align: center;
-  color: #ffff00;
-  font-size: 20px;
-  animation: blink 1.5s infinite;
-  margin-top: 1rem;
-}
-
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0.3; }
-}
+/* メッセージの▼マーク（白） */
+.dq-continue { text-align: center; color: #fff; font-size: 16px; animation: blink 1.2s infinite; margin-top: 0.25rem; }
+@keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0.35; } }
 """
 
 DRAGON_QUEST_CSS = f"<style>{DQ_CSS}</style>"
@@ -242,12 +174,18 @@ class Fighter:
 
 # ====== ユーティリティ ======
 def init_game():
-    st.session_state.player = Fighter("勇者", max_hp=120, atk=20)
-    st.session_state.boss   = Fighter("タイポ魔王", max_hp=200, atk=18)
     questions = load_questions()
     if not questions:
         st.error("問題が読み込めませんでした。ゲームを開始できません。")
         return
+    n = len(questions)
+    # 問題数に応じてHPをスケーリング（基準=40問、40未満でも下げない）
+    hp_scale = max(1.0, n / BASELINE_QUESTIONS) * EXTRA_HP_SCALE
+    player_hp = int(round(PLAYER_BASE_HP * hp_scale))
+    boss_hp = int(round(BOSS_BASE_HP * hp_scale))
+
+    st.session_state.player = Fighter("勇者", max_hp=player_hp, atk=PLAYER_ATK)
+    st.session_state.boss   = Fighter("タイポ魔王", max_hp=boss_hp, atk=BOSS_ATK)
     pool = questions[:]
     random.shuffle(pool)
     st.session_state.qs = pool
@@ -257,34 +195,44 @@ def init_game():
     st.session_state.last = None   # ("correct"/"wrong", 正解番号, 解説)
     st.session_state.state = "asking"
 
-def dq_hp_bar(name: str, current: int, maximum: int, character: str):
+def dq_hp_bar(name: str, current: int, maximum: int, character: str, icon_path: str | None = None):
     """ドラクエ風HPバー表示（3層構造）"""
     pct = max(0, min(1, current/maximum))
     width = f"{pct*100:.1f}%"
-    
+
     # HP割合に応じて色を変更（ドラクエ風）
+    # モノクロでも識別できるように白濃淡（ただしHPバーだけは視認性重視で灰～白）
     if pct > 0.6:
-        hp_color = "#00ff00"  # 緑
+        hp_color = "#e6e6e6"  # 明るい灰
     elif pct > 0.3:
-        hp_color = "#ffff00"  # 黄
+        hp_color = "#bfbfbf"  # 中間灰
     else:
-        hp_color = "#ff0000"  # 赤
-    
+        hp_color = "#808080"  # 濃い灰
+
+    # アイコン（任意のPNGがあれば使用、なければ絵文字）
+    img_html = ""
+    if icon_path and os.path.exists(icon_path):
+        img_html = f'<img class="dq-character-img" src="{icon_path}" alt="{name}">'
+
     html = f"""
     <div class="dq-status">
-        <div class="dq-character">{character}</div>
-        <div class="dq-window-1">
-            <div class="dq-window-2">
-                <div class="dq-window-3" style="text-align: center; margin: 0; padding: 0.5rem;">
-                    {name}
+        <div class="dq-status-wrap">
+            {img_html if img_html else f'<div class="dq-character">{character}</div>'}
+            <div style="flex:1">
+                <div class="dq-window-1">
+                    <div class="dq-window-2">
+                        <div class="dq-window-3" style="text-align: center; margin: 0; padding: 0.35rem;">
+                            {name}
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-        <div class="dq-hpbar-container">
-            <div class="dq-hpbar-border">
-                <div class="dq-hpbar">
-                    <div class="dq-hpbar-fill" style="--w:{width}; --hp-color:{hp_color};"></div>
-                    <div class="dq-hpbar-text">HP: {current} / {maximum}</div>
+                <div class="dq-hpbar-container">
+                    <div class="dq-hpbar-border">
+                        <div class="dq-hpbar">
+                            <div class="dq-hpbar-fill" style="--w:{width}; --hp-color:{hp_color};"></div>
+                            <div class="dq-hpbar-text">HP: {current} / {maximum}</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -303,7 +251,7 @@ def dq_message_box(message: str, title: str = ""):
         </div>
     </div>
     """ if title else ""
-    
+
     html = f"""
     {title_html}
     <div class="dq-window-1">
@@ -331,31 +279,20 @@ player = st.session_state.player
 boss = st.session_state.boss
 
 # ====== ヘッダ ======
-st.markdown("## 🐉 勇者の冒険：CBTクエスト")
-st.caption("正解で魔物を攻撃！ 不正解で反撃を受ける。3連続正解で **会心の一撃**！")
+st.markdown("## CBTクエスト")
+# st.caption("正解で攻撃 / 不正解で被弾。3連続正解で会心！")
 
-# リセットボタンも3層構造
-reset_button_html = """
-<div class="dq-window-1" style="margin: 1rem 0;">
-    <div class="dq-window-2">
-        <div class="dq-window-3" style="text-align: center; cursor: pointer;">
-            冒険をやり直す
-        </div>
-    </div>
-</div>
-"""
-st.markdown(reset_button_html, unsafe_allow_html=True)
-
-if st.button("実行", key="reset"):
+# リセット（本物のボタンをDQ風にスタイル）
+if st.button("🔄 冒険をやり直す", key="reset_btn", use_container_width=True):
     init_game()
     st.rerun()
 
 # HPバー（ドラクエ風）
 c1, c2 = st.columns(2)
 with c1:
-    dq_hp_bar("勇者", player.hp, player.max_hp, "🧙‍♂️")
+    dq_hp_bar("勇者", player.hp, player.max_hp, "🧙‍♂️", icon_path="assets/player.png")
 with c2:
-    dq_hp_bar("タイポ魔王", boss.hp, boss.max_hp, "👾")
+    dq_hp_bar("タイポ魔王", boss.hp, boss.max_hp, "👾", icon_path="assets/boss.png")
 
 st.divider()
 
@@ -374,7 +311,7 @@ if st.session_state.state == "finished":
             dq_message_box("時間切れだが優勢！よく戦った！", "⌛ 引き分け")
         else:
             dq_message_box("時間切れで痛み分け。復習して再挑戦！", "⌛ 引き分け")
-    
+
     # スコア表示をドラクエ風に（3層構造）
     score_html = f"""
     <div class="dq-window-1">
@@ -404,22 +341,17 @@ if idx >= len(st.session_state.qs):
 
 q = st.session_state.qs[idx]
 
-# ドラクエ風の問題表示（3層構造）
 html = f"""
-<div class="dq-window-1">
-    <div class="dq-window-2">
-        <div class="dq-window-3">
-            <div style="color: #ffff00; text-align: center; font-size: 1.2em; margin-bottom: 1rem;">
-                ターン {idx+1}
-            </div>
-            <div style="margin-bottom: 0.5rem;">
-                <strong>[Unit {q['unit']}] {q['topic']}</strong>
-            </div>
-            <div>
-                {q["q"]}
-            </div>
-        </div>
+<div class=\"dq-window-1\">
+  <div class=\"dq-window-2\">
+    <div class=\"dq-window-3\">
+      <div style=\"display:flex; justify-content:space-between; align-items:center; margin-bottom:.35rem;\">
+        <span>ターン {idx+1}</span>
+        <span><strong>[Unit {q['unit']}] {q['topic']}</strong></span>
+      </div>
+      <div>{q['q']}</div>
     </div>
+  </div>
 </div>
 """
 st.markdown(html, unsafe_allow_html=True)
@@ -434,19 +366,8 @@ choice = st.radio(
 # ====== 判定 ======
 if st.session_state.state == "asking":
     disabled = choice is None
-    # ドラクエ風ボタン（3層構造）
-    button_html = f"""
-    <div class="dq-window-1" style="margin: 1rem 0;">
-        <div class="dq-window-2">
-            <div class="dq-window-3" style="text-align: center; cursor: {'not-allowed' if disabled else 'pointer'}; opacity: {'0.5' if disabled else '1'};">
-                ⚔️ たたかう
-            </div>
-        </div>
-    </div>
-    """
-    st.markdown(button_html, unsafe_allow_html=True)
-    
-    if not disabled and st.button("実行", key="battle"):
+    # ドラクエ風の本物のボタン
+    if st.button("⚔️ たたかう", key="battle_btn", disabled=disabled, use_container_width=True):
         picked = None if choice is None else int(choice.split(")")[0])
         if picked == q["a"]:
             # 連続正解判定（3連続で会心の一撃）
@@ -467,13 +388,13 @@ elif st.session_state.state == "judged":
     result, ans_idx, exp, amount, crit = st.session_state.last
     if result == "correct":
         crit_msg = "会心の一撃だ！" if crit else ""
-        dq_message_box(f"正解！ {crit_msg}{boss.name}に {amount} のダメージを与えた！", "🗡️ 攻撃成功")
+        dq_message_box(f"正解！ {crit_msg}{boss.name}に {amount} のダメージ！", "🗡️ 攻撃成功")
         dq_damage_text(f"-{amount}", True)
         if crit:
             st.toast("💥 会心の一撃！", icon="🔥")
     else:
-        dq_message_box(f"不正解… {boss.name}の反撃！ {amount} のダメージを受けた！", "💀 被弾")
-        
+        dq_message_box(f"不正解… {boss.name}の反撃！ {amount} のダメージ…", "💀 被弾")
+
         # 正解表示をドラクエ風に（3層構造）
         correct_html = f"""
         <div class="dq-window-1">
@@ -493,19 +414,8 @@ elif st.session_state.state == "judged":
     # 終了チェック
     end = (not player.alive()) or (not boss.alive())
 
-    # 次へボタンも3層構造
-    next_button_html = f"""
-    <div class="dq-window-1" style="margin: 1rem 0;">
-        <div class="dq-window-2">
-            <div class="dq-window-3" style="text-align: center; cursor: pointer;">
-                ▶ つぎへ
-            </div>
-        </div>
-    </div>
-    """
-    st.markdown(next_button_html, unsafe_allow_html=True)
-    
-    if st.button("実行", key="next"):
+    # 次へ（本物のボタン）
+    if st.button("▶ つぎへ", key="next_btn", use_container_width=True):
         st.session_state.idx += 1
         st.session_state.state = "finished" if end else "asking"
         st.rerun()
